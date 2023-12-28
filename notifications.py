@@ -137,7 +137,7 @@ def runNotifications():
             time_diff = 300
 
         # Wait until the target time and send an email alert
-        print(f"Waiting for {time_diff // 60} minutes until {target_time} for {event[0]}")
+        print(f"Waiting for {time_diff} seconds until {target_time}")
         time.sleep(time_diff)
         emailAlert(event[1], event[0], os.getenv("TO_EMAIL"))
 
