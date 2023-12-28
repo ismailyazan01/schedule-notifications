@@ -198,6 +198,10 @@ def recurringEvents(event, complete):
     identifier = ""
     eventLowerCase = event.lower()
 
+    if "(recurring)" not in eventLowerCase:
+        incompleteToDo.append(event)
+        return
+
     keywords = {
         "Prayer": ["fajir", "duhr", "asr", "maghrib", "isha", "jumuah"],
         "Reading": ["read", "reading"],
@@ -215,10 +219,6 @@ def recurringEvents(event, complete):
     # Execute the SQL query to update the event's status
     connection = connectToDatabase()
     cursor = connection.cursor()
-
-    if "(recurring)" not in eventLowerCase:
-        incompleteToDo.append(event)
-        return
 
     showValueQuery = "SELECT planned FROM events WHERE event_name = %s"
     cursor.execute(showValueQuery, (identifier,))
