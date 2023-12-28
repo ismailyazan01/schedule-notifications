@@ -7,7 +7,6 @@ from datetime import datetime
 import mysql.connector
 import matplotlib.pyplot as plt
 
-
 # Load environment variables from a .env file
 load_dotenv()
 
@@ -17,16 +16,16 @@ incompleteToDo = []
 
 
 # Function to read the schedule from a text file
-def readSchedule(txtfile):
+def readSchedule(textfile):
     """
     Reads a schedule from a text file and stores it in the global schedule list.
     Each line in the file is expected to be either a header or an event.
     Events are expected to be in the format 'Event Description @ Time'.
 
     Parameters:
-    txtfile (str): The path to the text file containing the schedule.
+    textfile (str): The path to the text file containing the schedule.
     """
-    with open(txtfile, 'r') as file:
+    with open(textfile, 'r') as file:
         for line in file:
             line = line.strip('\n')  # Remove newline characters
             if line[0] in '0123456789':
@@ -69,7 +68,7 @@ def emailAlert(subject, body, to):
 
 
 # Function to process and format time strings
-def readTime(time):
+def readTime(eventTime):
     """
     Converts time strings into a 24-hour format.
 
@@ -82,31 +81,35 @@ def readTime(time):
     try:
         # Process and convert time strings to 24-hour format
         # Additional logic here for handling 'am'/'pm' and other time formats
-        if "a" not in time and "A" not in time and "p" not in time and "P" not in time:
-            if ":" not in time:
-                return time + ":00:00"
+        if "a" not in eventTime and "A" not in eventTime and "p" not in eventTime and "P" not in eventTime:
+            if ":" not in eventTime:
+                return eventTime + ":00:00"
             else:
-                return time + ":00"
-        if "a" in time or "A" in time:
-            if "12" not in time[0:2] and ":" not in time:
-                return time.split()[0] + ":00:00"
-            elif "12" not in time[0:2] and ":" in time:
-                return time.split()[0] + ":00"
-            elif "12" in time[0:2] and ":" not in time:
+                return eventTime + ":00"
+        if "a" in eventTime or "A" in eventTime:
+            if "12" not in eventTime[0:2] and ":" not in eventTime:
+                return eventTime.split()[0] + ":00:00"
+            elif "12" not in eventTime[0:2] and ":" in eventTime:
+                return eventTime.split()[0] + ":00"
+            elif "12" in eventTime[0:2] and ":" not in eventTime:
                 return "00:00:00"
-            elif "12" in time[0:2] and ":" in time:
-                return "00:" + time[3:5] + ":00"
-        if "p" in time or "P" in time:
-            if "12" not in time[0:2] and ":" not in time:
-                return str(int(time.split()[0]) + 12) + ":00:00"
-            elif "12" not in time[0:2] and ":" in time:
-                return str(int(time.split(":")[0]) + 12) + ":" + time.split(":")[1][:2] + ":00"
-            elif "12" in time[0:2] and ":" not in time:
+            elif "12" in eventTime[0:2] and ":" in eventTime:
+                return "00:" + eventTime[3:5] + ":00"
+        if "p" in eventTime or "P" in eventTime:
+            if "12" not in eventTime[0:2] and ":" not in eventTime:
+                return str(int(eventTime.split()[0]) + 12) + ":00:00"
+            elif "12" not in eventTime[0:2] and ":" in eventTime:
+                return str(int(eventTime.split(":")[0]) + 12) + ":" + eventTime.split(":")[1][:2] + ":00"
+            elif "12" in eventTime[0:2] and ":" not in eventTime:
                 return "12:00:00"
-            elif "12" in time[0:2] and ":" in time:
-                return time.split()[0] + ":00"
-    except Exception as e:
-        print("Invalid input")
+            elif "12" in eventTime[0:2] and ":" in eventTime:
+                return eventTime.split()[0] + ":00"
+    except ValueError:
+        print("Invalid time format, please ensure the time is in the correct format.")
+    except IndexError:
+        print("Unexpected time format, unable to parse the time.")
+    except TypeError:
+        print("Invalid input type, expected a string.")
 
 
 # Function to run the notification process
@@ -118,27 +121,27 @@ def runNotifications():
     readSchedule("schedule.txt")  # Read the schedule from 'schedule.txt'
 
     for event in schedule[1:]:
-        current_time = datetime.now().strftime("%H:%M:%S")  # Get current time
-        target_time = event[1]  # Get the target time for the notification
+        currentTime = datetime.now().strftime("%H:%M:%S")  # Get current time
+        targetTime = event[1]  # Get the target time for the notification
 
         # Convert current_time and target_time to datetime objects
-        current_datetime = datetime.strptime(current_time, "%H:%M:%S")
-        target_datetime = datetime.strptime(target_time, "%H:%M:%S")
+        currentDateTime = datetime.strptime(currentTime, "%H:%M:%S")
+        targetDateTime = datetime.strptime(targetTime, "%H:%M:%S")
 
         # Calculate time difference
-        time_diff = (target_datetime - current_datetime).total_seconds()
+        timeDiff = (targetDateTime - currentDateTime).total_seconds()
 
-        if time_diff < 0:
+        if timeDiff < 0:
             continue
 
         if "urgent" in event[0].lower():
-            time.sleep(time_diff - 300.0)
+            time.sleep(timeDiff - 300.0)
             emailAlert(event[1], event[0], os.getenv("TO_EMAIL"))
-            time_diff = 300
+            timeDiff = 300
 
         # Wait until the target time and send an email alert
-        print(f"Waiting for {time_diff} seconds until {target_time}")
-        time.sleep(time_diff)
+        print(f"Waiting for {timeDiff} seconds until {targetTime}")
+        time.sleep(timeDiff)
         emailAlert(event[1], event[0], os.getenv("TO_EMAIL"))
 
         if "urgent" in event[0].lower():
@@ -171,7 +174,7 @@ def endDayEventEntry():
         """
     # Iterate through each event and update its completion status
     for event in schedule[1:]:
-        if type(event) == list:
+        if type(event) is list:
             curEvent = event[0]
         else:
             curEvent = event
@@ -229,7 +232,7 @@ def recurringEvents(event, complete):
     else:
         update_query = "UPDATE events SET planned = planned + 1 WHERE event_name = %s"
 
-    cursor.execute(update_query, (identifier, ))
+    cursor.execute(update_query, (identifier,))
     connection.commit()
 
     cursor.close()
@@ -275,7 +278,7 @@ def clearDatabase():
     connection.close()
 
 
-def db_dataRetreival():
+def dbDataRetrieval():
     """
     Retrieves data from the 'events' table in the database and organizes it into columns.
 
@@ -317,12 +320,12 @@ def graphEvents():
     The graph displays the number of completed and incomplete attempts for each event.
     """
     # Retrieve event data from the database
-    columns = db_dataRetreival()
+    columns = dbDataRetrieval()
 
     # Lists for the x-axis and the y-values of the bar graph
-    x = []  # x-axis labels
-    y1 = [] # y-values for completed attempts
-    y2 = [] # y-values for incomplete attempts
+    xAxisEvents = []  # x-axis labels
+    yAxisCompleted = []  # y-values for completed attempts
+    yAxisIncomplete = []  # y-values for incomplete attempts
 
     # Populating the x, y1, and y2 lists with data
     for i in range(6):
@@ -347,13 +350,13 @@ def graphEvents():
             diffType = "day(s)"
 
         # Append the formatted string and the corresponding values to the lists
-        x.append(f"{str(columns[0][i])} \n in {diff} {diffType}")
-        y1.append(columns[2][i])
-        y2.append(columns[1][i] - columns[2][i])
+        xAxisEvents.append(f"{str(columns[0][i])} \n in {diff} {diffType}")
+        yAxisCompleted.append(columns[2][i])
+        yAxisIncomplete.append(columns[1][i] - columns[2][i])
 
     # Creating a stacked bar graph with black edge coloring
-    plt.bar(x, y1, color='c', edgecolor='k')
-    plt.bar(x, y2, bottom=y1, color='w', edgecolor='k')
+    plt.bar(xAxisEvents, yAxisCompleted, color='c', edgecolor='k')
+    plt.bar(xAxisEvents, yAxisIncomplete, bottom=yAxisCompleted, color='w', edgecolor='k')
 
     # Categories for the legend
     categories = ['Completed', 'Incomplete']
