@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 from datetime import datetime
 import mysql.connector
 import matplotlib.pyplot as plt
-import numpy as np
 
 
 # Load environment variables from a .env file
