@@ -367,5 +367,3 @@ def graphEvents():
 
 # Run the notification process
 runNotifications()
-graphEvents()
-clearDatabase()
