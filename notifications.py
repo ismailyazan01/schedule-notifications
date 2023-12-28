@@ -5,6 +5,8 @@ from email.message import EmailMessage
 from dotenv import load_dotenv
 from datetime import datetime
 import mysql.connector
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 # Load environment variables from a .env file
@@ -162,7 +164,7 @@ def unaccountedEventsMethod():
             return
         recurring = input("Add recurring(Y or N)? ")
         if recurring.lower() == 'y':
-            schedule.append("(recurring)" + unaccountedEvent)
+            schedule.append("(Recurring) " + unaccountedEvent)
         else:
             schedule.append(unaccountedEvent)
 
@@ -179,9 +181,64 @@ def endDayEventEntry():
         else:
             curEvent = event
         if input(f"Did you complete this event: \"{curEvent}\"(Y or N)? ").lower() == 'n':
-            recurringEventHelper(curEvent, 'N')
+            recurringEvents(curEvent, False)
         else:
-            recurringEventHelper(curEvent, 'Y')
+            recurringEvents(curEvent, True)
+
+
+def recurringEvents(event, complete):
+    """
+    Updates the event's completion and planned status in the database.
+    It determines the event's category and constructs the appropriate SQL query to update the database.
+
+    Parameters:
+    event (str): The name of the event to update.
+    complete (str): 'Y' if the event was completed, 'N' otherwise.
+    """
+    # Determine the event's category and construct the SQL query
+    identifier = ""
+    eventLowerCase = event.lower()
+
+    keywords = {
+        "Prayer": ["fajir", "duhr", "asr", "maghrib", "isha", "jumuah"],
+        "Reading": ["read", "reading"],
+        "Workout": ["workout", "exercise", "football", "basketball", "boeing", "soccer", "gym"],
+        "Quran": ["quran", "halaqa"],
+        "Coding": ["coding", "program"],
+        "School": ["school", "class"]
+    }
+
+    for category, words in keywords.items():
+        if any(word in eventLowerCase for word in words):
+            identifier = category
+            break
+
+    # Execute the SQL query to update the event's status
+    connection = connectToDatabase()
+    cursor = connection.cursor()
+
+    if "(recurring)" not in eventLowerCase:
+        incompleteToDo.append(event)
+        return
+
+    showValueQuery = "SELECT planned FROM events WHERE event_name = %s"
+    cursor.execute(showValueQuery, (identifier,))
+    result = cursor.fetchone()[0]
+
+    if result == 0:
+        firstPlannedQuery = "UPDATE events SET first_planned = CURRENT_TIMESTAMP WHERE event_name = %s"
+        cursor.execute(firstPlannedQuery, (identifier,))
+
+    if complete:
+        update_query = "UPDATE events SET completed = completed + 1, planned = planned + 1 WHERE event_name = %s"
+    else:
+        update_query = "UPDATE events SET planned = planned + 1 WHERE event_name = %s"
+
+    cursor.execute(update_query, (identifier, ))
+    connection.commit()
+
+    cursor.close()
+    connection.close()
 
 
 def connectToDatabase():
@@ -201,49 +258,119 @@ def connectToDatabase():
     return db_connection
 
 
-def recurringEventHelper(event, complete):
+def clearDatabase():
     """
-    Updates the event's completion and planned status in the database.
-    It determines the event's category and constructs the appropriate SQL query to update the database.
-
-    Parameters:
-    event (str): The name of the event to update.
-    complete (str): 'Y' if the event was completed, 'N' otherwise.
+    This function clears all entries in the 'events' table of the database by setting
+    the 'planned' and 'completed' columns to 0, and 'first_planned' to NULL.
     """
-    # Determine the event's category and construct the SQL query
-    identifier = ""
-    eventLowerCase = event.lower()
-
-    keywords = {
-        "Prayer": ["fajir", "duhr", "asr", "maghrib", "isha", "jumuah"],
-        "Reading": ["read", "reading"],
-        "Workout": ["workout", "exercise", "football", "basketball", "boeing", "soccer"],
-        "Quran": ["quran", "halaqa"],
-        "Coding": ["coding", "program"],
-        "School": ["school", "class"]
-    }
-
-    for category, words in keywords.items():
-        if any(word in eventLowerCase for word in words):
-            identifier = category
-            break
-
-    # Execute the SQL query to update the event's status
+    # Establishing a database connection
     connection = connectToDatabase()
     cursor = connection.cursor()
 
-    if "(recurring)" not in eventLowerCase:
-        incompleteToDo.append(event)
+    # SQL query to reset the event data
+    clearDatabaseQuery = "UPDATE events SET planned = 0, completed = 0, first_planned = NULL;"
 
-    if complete.lower() == 'y':
-        update_query = "UPDATE events SET completed = completed + 1, planned = planned + 1 WHERE event_name = %s"
-    else:
-        update_query = "UPDATE events SET planned = planned + 1 WHERE event_name = %s"
-    cursor.execute(update_query, (identifier, ))
+    # Executing the SQL query
+    cursor.execute(clearDatabaseQuery)
+    # Committing the changes to the database
     connection.commit()
+
+    # Closing the cursor and the database connection
     cursor.close()
     connection.close()
 
 
+def db_dataRetreival():
+    """
+    Retrieves data from the 'events' table in the database and organizes it into columns.
+
+    Returns:
+        A list of lists, where each sublist contains a column from the 'events' table.
+    """
+    # Establishing a database connection
+    connection = connectToDatabase()
+    cursor = connection.cursor()
+
+    # Initializing a list of lists for each column
+    columns = [[], [], [], []]
+
+    # SQL query to retrieve data from all columns in 'events'
+    query = "SELECT event_name, planned, completed, first_planned FROM events"
+    # Executing the query
+    cursor.execute(query)
+    # Fetching all results from the executed query
+    result = cursor.fetchall()
+
+    # Unpacking the results into separate lists for each column
+    for event_name, planned, completed, first_planned in result:
+        columns[0].append(event_name)
+        columns[1].append(planned)
+        columns[2].append(completed)
+        columns[3].append(first_planned)
+
+    # Closing the cursor and the database connection
+    cursor.close()
+    connection.close()
+
+    # Returning the organized data
+    return columns
+
+
+def graphEvents():
+    """
+    Retrieves event data from the database and creates a stacked bar graph.
+    The graph displays the number of completed and incomplete attempts for each event.
+    """
+    # Retrieve event data from the database
+    columns = db_dataRetreival()
+
+    # Lists for the x-axis and the y-values of the bar graph
+    x = []  # x-axis labels
+    y1 = [] # y-values for completed attempts
+    y2 = [] # y-values for incomplete attempts
+
+    # Populating the x, y1, and y2 lists with data
+    for i in range(6):
+        now = datetime.now()
+        difference = now - columns[3][i]
+
+        # Calculate total seconds for time difference
+        totalSeconds = difference.total_seconds()
+        # Constants for seconds in a year and a day
+        secondsInYear = 365.25 * 24 * 60 * 60
+        secondsInDay = 24 * 60 * 60
+
+        # Determine the appropriate time unit and calculate the difference
+        if difference > secondsInYear:
+            diff = totalSeconds // secondsInYear
+            diffType = "year(s)"
+        elif difference < secondsInDay:
+            diff = totalSeconds // 3600
+            diffType = "hour(s)"
+        else:
+            diff = difference.days
+            diffType = "day(s)"
+
+        # Append the formatted string and the corresponding values to the lists
+        x.append(f"{str(columns[0][i])} \n in {diff} {diffType}")
+        y1.append(columns[2][i])
+        y2.append(columns[1][i] - columns[2][i])
+
+    # Creating a stacked bar graph with black edge coloring
+    plt.bar(x, y1, color='c', edgecolor='k')
+    plt.bar(x, y2, bottom=y1, color='w', edgecolor='k')
+
+    # Categories for the legend
+    categories = ['Completed', 'Incomplete']
+
+    # Adding a legend in the upper right corner
+    plt.legend(categories, loc='upper right')
+
+    # Displaying the graph
+    plt.show()
+
+
 # Run the notification process
 runNotifications()
+graphEvents()
+clearDatabase()
