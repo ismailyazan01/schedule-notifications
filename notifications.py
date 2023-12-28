@@ -161,11 +161,7 @@ def unaccountedEventsMethod():
         unaccountedEvent = input("Add unaccounted for events(Type \"done\" to quit): ")
         if unaccountedEvent.lower() == "done":
             return
-        recurring = input("Add recurring(Y or N)? ")
-        if recurring.lower() == 'y':
-            schedule.append("(Recurring) " + unaccountedEvent)
-        else:
-            schedule.append(unaccountedEvent)
+        schedule.append(unaccountedEvent)
 
 
 def endDayEventEntry():
@@ -198,10 +194,6 @@ def recurringEvents(event, complete):
     identifier = ""
     eventLowerCase = event.lower()
 
-    if "(recurring)" not in eventLowerCase:
-        incompleteToDo.append(event)
-        return
-
     keywords = {
         "Prayer": ["fajir", "duhr", "asr", "maghrib", "isha", "jumuah"],
         "Reading": ["read", "reading"],
@@ -215,6 +207,10 @@ def recurringEvents(event, complete):
         if any(word in eventLowerCase for word in words):
             identifier = category
             break
+
+    if identifier == "":
+        incompleteToDo.append(event)
+        return
 
     # Execute the SQL query to update the event's status
     connection = connectToDatabase()
