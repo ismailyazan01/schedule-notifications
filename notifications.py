@@ -136,17 +136,17 @@ def runNotifications():
 
         if "urgent" in event[0].lower():
             time.sleep(timeDiff - 300.0)
-            emailAlert(event[1], event[0], os.getenv("TO_EMAIL"))
+            emailAlert(schedule[0], str(event[0]) + " in 5 minutes!", os.getenv("TO_NUMBER"))
+            emailAlert(event[1], str(event[0]) + " in 5 minutes!", os.getenv("TO_EMAIL"))
             timeDiff = 300
 
         # Wait until the target time and send an email alert
         print(f"Waiting for {timeDiff} seconds until {targetTime}")
         time.sleep(timeDiff)
         emailAlert(event[1], event[0], os.getenv("TO_EMAIL"))
-
         if "urgent" in event[0].lower():
-            time.sleep(300.0)
-            emailAlert(event[1], event[0], os.getenv("TO_EMAIL"))
+            emailAlert(schedule[0], event[0], os.getenv("TO_NUMBER"))
+
     # Handle unaccounted events and database connection at the end of the day
     unaccountedEventsMethod()
     connectToDatabase()
