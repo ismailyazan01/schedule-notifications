@@ -198,9 +198,9 @@ def recurringEvents(event, complete):
     eventLowerCase = event.lower()
 
     keywords = {
-        "Prayer": ["fajir", "duhr", "asr", "maghrib", "isha", "jumuah"],
+        "Prayers": ["fajir", "duhr", "asr", "maghrib", "isha", "jumuah"],
         "Reading": ["read", "reading"],
-        "Workout": ["workout", "exercise", "football", "basketball", "boeing", "soccer", "gym"],
+        "Workouts": ["workout", "exercise", "football", "basketball", "boeing", "soccer", "gym"],
         "Quran": ["quran", "halaqa"],
         "Coding": ["coding", "program"],
         "School": ["school", "class"]
@@ -330,29 +330,45 @@ def graphEvents():
     # Populating the x, y1, and y2 lists with data
     for i in range(6):
         now = datetime.now()
-        difference = now - columns[3][i]
+        if columns[3][i]:
+            difference = now - columns[3][i]
 
-        # Calculate total seconds for time difference
-        totalSeconds = difference.total_seconds()
-        # Constants for seconds in a year and a day
-        secondsInYear = 365.25 * 24 * 60 * 60
-        secondsInDay = 24 * 60 * 60
+            # Calculate total seconds for time difference
+            totalSeconds = difference.total_seconds()
+            # Constants for seconds in a year and a day
+            secondsInYear = 365.25 * 24 * 60 * 60
+            secondsInDay = 24 * 60 * 60
 
-        # Determine the appropriate time unit and calculate the difference
-        if difference > secondsInYear:
-            diff = totalSeconds // secondsInYear
-            diffType = "year(s)"
-        elif difference < secondsInDay:
-            diff = totalSeconds // 3600
-            diffType = "hour(s)"
+            # Determine the appropriate time unit and calculate the difference
+            if totalSeconds > secondsInYear:
+                diff = totalSeconds // secondsInYear
+                diffType = "year(s)"
+            elif totalSeconds < secondsInDay:
+                diff = totalSeconds // 3600
+                diffType = "hour(s)"
+            else:
+                diff = difference.days
+                diffType = "day(s)"
+
+            # Append the formatted string and the corresponding values to the lists
+            xAxisEvents.append(f"{str(columns[0][i])} \n in {diff}\n{diffType}")
+            yAxisCompleted.append(columns[2][i])
+            yAxisIncomplete.append(columns[1][i] - columns[2][i])
         else:
-            diff = difference.days
-            diffType = "day(s)"
+            xAxisEvents.append(columns[0][i])
+            yAxisCompleted.append(columns[2][i])
+            yAxisIncomplete.append(columns[1][i] - columns[2][i])
 
-        # Append the formatted string and the corresponding values to the lists
-        xAxisEvents.append(f"{str(columns[0][i])} \n in {diff} {diffType}")
-        yAxisCompleted.append(columns[2][i])
-        yAxisIncomplete.append(columns[1][i] - columns[2][i])
+    # Calculate the combined values for each stack by adding the corresponding elements of
+    # 'yAxisCompleted' and 'yAxisIncomplete', which represent the completed and incomplete portions
+    stackedValues = yAxisCompleted + yAxisIncomplete
+
+    # Find the maximum value among the combined stacked values to determine the highest point on the y-axis
+    maxStackedValue = max(stackedValues)
+
+    # Set the limits for the y-axis from 0 to 125% of the maximum stacked value to ensure there is
+    # 25% extra space above the tallest bar in the stack
+    plt.ylim(0, maxStackedValue * 1.25)
 
     # Creating a stacked bar graph with black edge coloring
     plt.bar(xAxisEvents, yAxisCompleted, color='c', edgecolor='k')
@@ -364,9 +380,10 @@ def graphEvents():
     # Adding a legend in the upper right corner
     plt.legend(categories, loc='upper right')
 
+    plt.tight_layout()
+
     # Displaying the graph
     plt.show()
 
 
-# Run the notification process
 runNotifications()
